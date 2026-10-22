@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Access</title>
+<style>
+  :root { --bg: #05070a; --accent: #58a6ff; --danger: #f85149; --success: #238636; --text: #c9d1d9; }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+  body { height: 100vh; overflow: hidden; background: var(--bg); color: var(--text); }
+  
+  #three-canvas { position: fixed; inset: 0; z-index: 1; display: none; }
+  .ui-layer { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; }
+  .screen { display: none; width: 100%; height: 100%; align-items: center; justify-content: center; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  .glass-panel { background: rgba(22, 27, 34, 0.9); border: 1px solid #30363d; border-radius: 16px; padding: 24px; text-align: center; max-width: 90vw; width: 400px; }
+  button { background: var(--success); color: #fff; border: none; padding: 14px; border-radius: 8px; font-size: 1rem; width: 100%; cursor: pointer; margin-top: 10px; }
+  
+  /* CSS Челюсти (замена 3D) */
+  .css-jaws-wrap { position: relative; width: 300px; height: 150px; display: flex; justify-content: center; align-items: center; margin-top: 20px; }
+  .css-jaw { position: absolute; width: 100%; height: 50%; background: #c0392b; transition: transform 0.3s; }
+  .css-jaw.top { top: 0; clip-path: polygon(0 0, 100% 0, 90% 100%, 10% 100%); transform: translateY(-100%); }
+  .css-jaw.bot { bottom: 0; clip-path: polygon(10% 0, 90% 0, 100% 100%, 0 100%); transform: translateY(100%); }
+  .css-jaw.bite.top { transform: translateY(0); }
+  .css-jaw.bite.bot { transform: translateY(0); }
+  
+  /* Стили для меню (если 3D нет) */
+  .fallback-menu { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; padding: 20px; }
+  .fallback-btn { width: 140px; height: 140px; background: #161b22; border: 2px solid #30363d; border-radius: 12px; color: #fff; font-weight: bold; font-size: 1.2rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+
+<canvas id="three-canvas"></canvas>
+
+<div class="ui-layer">
+  <div id="screen-warn" class="screen active">
+    <div class="glass-panel">
+      <h2 style="color:var(--danger)">ВНИМАНИЕ</h2>
+      <p style="margin:15px 0;">Ст. 272, 137 УК РФ. Демо-версия.</p>
+      <button onclick="startLoad()">ПРОДОЛЖИТЬ</button>
+    </div>
+  </div>
+
+  <div id="screen-load" class="screen">
+    <div class="glass-panel"><h3 id="load-text">Загрузка...</h3></div>
+  </div>
+
+  <div id="screen-molodec" class="screen">
+    <h1 id="mol-text" style="color:var(--accent); font-size: 3rem;">Molodec</h1>
+    <div class="css-jaws-wrap" id="css-jaws">
+      <div class="css-jaw top" id="jaw-t"></div>
+      <div class="css-jaw bot" id="jaw-b"></div>
+    </div>
+  </div>
+
+  <div id="screen-pass" class="screen">
+    <div class="glass-panel">
+      <h2 style="margin-bottom:10px;">ПАРОЛЬ</h2>
+      <input id="pass-in" type="password" style="width:100%; padding:10px; text-align:center; font-size:1.5rem; border-radius:8px; border:none; background:#0d1117; color:#fff;">
+      <button onclick="checkPass()">ВОЙТИ</button>
+    </div>
+  </div>
+
+  <div id="screen-fail" class="screen">
+    <div class="glass-panel">
+      <h3 style="color:var(--danger)">ОШИБКА</h3>
+      <p>Ваш IP: <span id="ip" style="color:#fff">...</span></p>
+      <button class="danger" style="background:var(--danger)" onclick="retry()">НАЗАД</button>
+    </div>
+  </div>
+
+  <div id="screen-menu" class="screen">
+    <div id="menu-container" class="fallback-menu">
+      <!-- Сюда вставится меню (3D или кнопки) -->
+    </div>
+  </div>
+
+  <div id="screen-section" class="screen">
+    <div class="glass-panel">
+      <h2 id="sec-title">РАЗДЕЛ</h2>
+      <p>Это демо-поиск.</p>
+      <button onclick="backMenu()">НАЗАД</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==========================================
+   1. БАЗОВАЯ ЛОГИКА (РАБОТАЕТ ВСЕГДА)
+   ========================================== */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function startLoad() {
+  show('screen-load');
+  let p = 0;
+  const int = setInterval(() => {
+    p += 15;
+    document.getElementById('load-text').textContent = p >= 100 ? 'Готово' : `Загрузка ${p}%`;
+    if (p >= 100) {
+      clearInterval(int);
+      setTimeout(() => {
+        show('screen-molodec');
+        setTimeout(doBite, 500);
+      }, 300);
+    }
+  }, 100);
+}
+
+function doBite() {
+  document.getElementById('mol-text').style.animation = 'shake 0.2s';
+  document.getElementById('css-jaws').classList.add('bite-active');
+  document.getElementById('jaw-t').classList.add('bite');
+  document.getElementById('jaw-b').classList.add('bite');
+  
+  if (typeof THREE_READY !== 'undefined' && THREE_READY) {
+    // Запуск 3D челюстей (если есть)
+    jawGroup.visible = true;
+  }
+
+  setTimeout(() => {
+    show('screen-pass');
+    document.getElementById('pass-in').focus();
+    if (typeof THREE_READY !== 'undefined' && THREE_READY) jawGroup.visible = false;
+  }, 800);
+}
+
+function checkPass() {
+  const val = document.getElementById('pass-in').value;
+  if (val === '31234') {
+    showMenu();
+  } else {
+    show('screen-fail');
+    fetch('https://api.ipify.org?format=json')
+      .then(r => r.json()).then(d => document.getElementById('ip').textContent = d.ip)
+      .catch(() => document.getElementById('ip').textContent = '127.0.0.1');
+  }
+}
+
+function retry() {
+  document.getElementById('pass-in').value = '';
+  show('screen-pass');
+}
+
+function showMenu() {
+  show('screen-menu');
+  const container = document.getElementById('menu-container');
+  
+  if (typeof THREE_READY !== 'undefined' && THREE_READY) {
+    // Если 3D работает, скрываем HTML-меню и показываем 3D кнопки
+    container.style.display = 'none';
+    menuGroup.visible = true;
+    document.getElementById('three-canvas').style.display = 'block';
+  } else {
+    // Если 3D НЕТ, показываем обычные HTML-кнопки
+    container.innerHTML = `
+      <button class="fallback-btn" onclick="openSec('OSINT')">OSINT</button>
+      <button class="fallback-btn" onclick="openSec('МВД')">МВД</button>
+      <button class="fallback-btn" onclick="openSec('ФССП')">ФССП</button>
+      <button class="fallback-btn" onclick="openSec('УТЕЧКИ')">УТЕЧКИ</button>
+    `;
+  }
+}
+
+function openSec(name) {
+  document.getElementById('sec-title').textContent = name;
+  show('screen-section');
+  if (typeof THREE_READY !== 'undefined' && THREE_READY) menuGroup.visible = false;
+}
+
+function backMenu() {
+  show('screen-menu');
+  if (typeof THREE_READY !== 'undefined' && THREE_READY) menuGroup.visible = true;
+}
+
+/* Анимация тряски */
+const style = document.createElement('style');
+style.textContent = `@keyframes shake { 0%,100%{transform:translate(0)} 25%{transform:translate(-5px,5px)} 75%{transform:translate(5px,-5px)} }`;
+document.head.appendChild(style);
+
+/* ==========================================
+   2. 3D (ЕСЛИ ЗАГРУЗИТСЯ)
+   ========================================== */
+let THREE_READY = false;
+const canvas = document.getElementById('three-canvas');
+
+// Грузим Three.js
+const script = document.createElement('script');
+script.src = 'https://unpkg.com/three@0.128.0/build/three.min.js';
+script.onload = () => {
+  try {
+    THREE_READY = true;
+    init3D();
+    console.log('3D загружено успешно');
+  } catch (e) {
+    console.warn('Ошибка 3D:', e);
+    THREE_READY = false;
+  }
+};
+script.onerror = () => { console.warn('3D не загрузилось (нет интернета или блокировка)'); };
+document.head.appendChild(script);
+
+let renderer, scene, camera, jawGroup, menuGroup;
+
+function init3D() {
+  renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
+  camera.position.set(0, 0, 7);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(5, 5, 5); scene.add(light);
+
+  // Челюсти
+  jawGroup = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0xc0392b });
+  const top = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.2, 10, 20, Math.PI), mat);
+  top.rotation.x = Math.PI/2; top.rotation.z = Math.PI; top.position.y = 0.5;
+  const bot = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.2, 10, 20, Math.PI), mat);
+  bot.rotation.x = Math.PI/2; bot.position.y = -0.5;
+  jawGroup.add(top, bot);
+  jawGroup.visible = false;
+  scene.add(jawGroup);
+
+  // Меню
+  menuGroup = new THREE.Group();
+  const colors = [0x1f6feb, 0x238636, 0x9e6a03, 0x8957e5];
+  const names = ['OSINT', 'МВД', 'ФССП', 'УТЕЧКИ'];
+  
+  for (let i = 0; i < 4; i++) {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 0.2), new THREE.MeshStandardMaterial({ color: colors[i] }));
+    box.position.set((i - 1.5) * 1.6, 0, 0);
+    box.userData = { name: names[i] };
+    menuGroup.add(box);
+  }
+  menuGroup.visible = false;
+  scene.add(menuGroup);
+
+  // Рендер
+  function animate() {
+    requestAnimationFrame(animate);
+    if (jawGroup.visible) {
+      top.position.y = Math.max(top.position.y - 0.05, 0.1);
+      bot.position.y = Math.min(bot.position.y + 0.05, -0.1);
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+}
+</script>
+</body>
+  </html>
